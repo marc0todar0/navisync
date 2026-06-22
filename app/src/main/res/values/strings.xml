@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NaviSync</string>
+    <string name="sync_channel_name">Sync</string>
+    <string name="sync_channel_desc">Avanzamento della sincronizzazione musicale</string>
+</resources>
