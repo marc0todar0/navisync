@@ -8,7 +8,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import eu.todaro.navisync.data.store.SettingsStore
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.ServerConfig
+import eu.todaro.navisync.sync.M3uParser
+import eu.todaro.navisync.sync.PushBus
+import eu.todaro.navisync.sync.PushEngine
 import eu.todaro.navisync.sync.SyncBus
 import eu.todaro.navisync.sync.SyncWorker
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +47,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val progress = SyncBus.progress
     val running = SyncBus.running
+
+    // Push playlist
+    val pushProgress = PushBus.progress
+    val pushRunning = PushBus.running
+    val pushPlans = PushBus.plans
 
     init {
         viewModelScope.launch {
@@ -97,5 +106,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun startSync() {
         save()
         SyncWorker.enqueue(getApplication())
+    }
+
+    /** Analizza i m3u selezionati (nome, contenuto già letti dalla UI) abbinandoli al server. */
+    fun analyzeM3u(files: List<Pair<String, String>>) {
+        if (files.isEmpty() || pushRunning.value) return
+        val parsed = files.map { (name, content) -> M3uParser.parse(name, content) }
+        PushBus.setPlans(emptyList())
+        PushBus.setRunning(true)
+        viewModelScope.launch {
+            try {
+                val plans = withContext(Dispatchers.IO) {
+                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password))
+                        .analyze(parsed) { PushBus.update(it) }
+                }
+                PushBus.setPlans(plans)
+            } catch (e: Exception) {
+                PushBus.update(
+                    PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Analisi fallita")
+                )
+            } finally {
+                PushBus.setRunning(false)
+            }
+        }
+    }
+
+    /** Carica su Navidrome le playlist non saltate del piano corrente. */
+    fun pushPlaylists() {
+        val plans = pushPlans.value
+        if (plans.none { !it.skipped } || pushRunning.value) return
+        PushBus.setRunning(true)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password))
+                        .push(plans) { PushBus.update(it) }
+                }
+            } catch (e: Exception) {
+                PushBus.update(
+                    PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Push fallito")
+                )
+            } finally {
+                PushBus.setRunning(false)
+            }
+        }
     }
 }

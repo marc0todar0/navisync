@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,19 +24,30 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.compose.runtime.rememberCoroutineScope
+import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.SyncProgress
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +83,16 @@ fun MainScreen(
 
             SetupSection(vm)
             HorizontalDivider()
-            SyncSection(vm, enabled = hasAccess)
+
+            var tab by remember { mutableIntStateOf(0) }
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Scarica") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Carica playlist") })
+            }
+            when (tab) {
+                0 -> SyncSection(vm, enabled = hasAccess)
+                else -> PushSection(vm)
+            }
         }
     }
 }
@@ -187,4 +209,111 @@ private fun SyncSection(vm: MainViewModel, enabled: Boolean) {
             }
         }
     }
+}
+
+@Composable
+private fun PushSection(vm: MainViewModel) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val progress by vm.pushProgress.collectAsStateWithLifecycle()
+    val running by vm.pushRunning.collectAsStateWithLifecycle()
+    val plans by vm.pushPlans.collectAsStateWithLifecycle()
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            val files = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    val name = displayName(context, uri) ?: return@mapNotNull null
+                    if (!name.endsWith(".m3u", true) && !name.endsWith(".m3u8", true)) return@mapNotNull null
+                    val content = runCatching {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    }.getOrNull() ?: return@mapNotNull null
+                    name to content
+                }
+            }
+            if (files.isNotEmpty()) vm.analyzeM3u(files)
+        }
+    }
+
+    Text("Carica playlist su Navidrome", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Seleziona file .m3u/.m3u8 (es. esportati da Auxio). Le tracce vengono abbinate alla libreria: " +
+            "playlist con nome già esistente vengono sostituite, le altre create.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Button(
+        onClick = { picker.launch(arrayOf("*/*")) },
+        enabled = !running && vm.baseUrl.isNotBlank(),
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text("Seleziona file .m3u/.m3u8") }
+
+    if (plans.isNotEmpty()) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                plans.forEach { plan ->
+                    val action = when {
+                        plan.skipped -> "saltata"
+                        plan.existingId != null -> "sostituisci"
+                        else -> "crea"
+                    }
+                    val dup = if (plan.duplicateNames) " ⚠ nome duplicato" else ""
+                    Text(
+                        "${plan.name} — ${plan.match.matched}/${plan.match.total} abbinate · $action$dup",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (plan.skipped) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (plan.skipped && plan.match.unmatched.isNotEmpty()) {
+                        plan.match.unmatched.take(10).forEach { u ->
+                            Text("   ✗ $u", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (plan.match.unmatched.size > 10) {
+                            Text("   … e altre ${plan.match.unmatched.size - 10}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+        Button(
+            onClick = { vm.pushPlaylists() },
+            enabled = !running && plans.any { !it.skipped },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            val n = plans.count { !it.skipped }
+            Text(if (running) "Caricamento…" else "Carica su Navidrome ($n)")
+        }
+    }
+
+    if (progress.phase != PushProgress.Phase.IDLE) {
+        val label = when (progress.phase) {
+            PushProgress.Phase.ANALYZING -> "Analisi… ${progress.done}/${progress.total}"
+            PushProgress.Phase.PUSHING -> "Caricamento ${progress.done}/${progress.total}"
+            PushProgress.Phase.DONE -> "Completato"
+            PushProgress.Phase.FAILED -> "Errore: ${progress.error ?: ""}"
+            PushProgress.Phase.IDLE -> ""
+        }
+        Text(label)
+        if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (progress.log.isNotEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    progress.log.takeLast(12).forEach { line ->
+                        Text(line, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun displayName(context: android.content.Context, uri: Uri): String? {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) {
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0) return c.getString(idx)
+        }
+    }
+    return uri.lastPathSegment?.substringAfterLast('/')
 }
