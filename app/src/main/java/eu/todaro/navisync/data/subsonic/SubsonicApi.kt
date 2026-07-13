@@ -24,4 +24,16 @@ interface SubsonicApi {
 
     @GET("rest/getPlaylist.view")
     suspend fun getPlaylist(@Query("id") id: String): SubsonicEnvelope
+
+    /**
+     * Crea una nuova playlist (con [name]) o ne sostituisce integralmente il contenuto (con [playlistId]).
+     * Parametri in query string: Navidrome li legge dall'URL (come tutti gli altri endpoint .view),
+     * non dal body form. Retrofit espande la lista [songIds] in `songId=a&songId=b…`.
+     */
+    @GET("rest/createPlaylist.view")
+    suspend fun createPlaylist(
+        @Query("name") name: String?,
+        @Query("playlistId") playlistId: String?,
+        @Query("songId") songIds: List<String>,
+    ): SubsonicEnvelope
 }

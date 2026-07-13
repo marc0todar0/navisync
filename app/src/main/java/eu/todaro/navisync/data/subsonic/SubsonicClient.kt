@@ -118,6 +118,27 @@ class SubsonicClient(
         }
     }
 
+    /** Elenco leggero delle playlist (id + nome), senza scaricare le tracce di ciascuna. */
+    suspend fun listPlaylistRefs(): List<PlaylistRef> =
+        api.getPlaylists().response.check().playlists?.playlist.orEmpty()
+
+    /**
+     * Crea (se [existingId] è null) o SOSTITUISCE integralmente (se [existingId] è valorizzato)
+     * una playlist sul server. Navidrome, quando riceve un playlistId, rimpiazza l'intero
+     * contenuto con i soli [songIds] passati (non fa append). Ritorna l'id della playlist.
+     *
+     * Nota: i parametri viaggiano in query string (createPlaylist è GET), quindi playlist molto
+     * grandi generano URL lunghi; per le dimensioni tipiche non è un problema.
+     */
+    suspend fun createOrReplacePlaylist(name: String, existingId: String?, songIds: List<String>): String {
+        val resp = api.createPlaylist(
+            name = if (existingId == null) name else null,
+            playlistId = existingId,
+            songIds = songIds,
+        ).response.check()
+        return resp.playlist?.id ?: existingId ?: ""
+    }
+
     fun downloadUrl(id: String): HttpUrl =
         baseHttpUrl.newBuilder().addPathSegments("rest/download.view").addQueryParameter("id", id).build()
 
