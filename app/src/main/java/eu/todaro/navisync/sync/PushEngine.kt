@@ -9,7 +9,14 @@ import eu.todaro.navisync.domain.PushReport
  * Orchestrazione del push: analizza i m3u abbinandoli al server (dry-run), poi carica
  * solo le playlist completamente abbinate creando/sostituendo su Navidrome.
  */
-class PushEngine(private val client: SubsonicClient) {
+class PushEngine(
+    private val client: SubsonicClient,
+    /** Nome della playlist "preferiti": se un m3u ha questo nome, mappa alle stelle invece che a una playlist. Null = disabilitato. */
+    private val favoritesName: String? = null,
+) {
+
+    private fun isFavorites(name: String): Boolean =
+        !favoritesName.isNullOrBlank() && name.trim().equals(favoritesName.trim(), ignoreCase = true)
 
     /** Fase di analisi: costruisce un [PlaylistPlan] per ogni m3u senza toccare il server. */
     suspend fun analyze(
@@ -36,18 +43,25 @@ class PushEngine(private val client: SubsonicClient) {
                 )
             )
             val match = matcher.match(pl.entries)
-            val existing = byName[pl.name.lowercase()].orEmpty()
+            val fav = isFavorites(pl.name)
+            val existing = if (fav) emptyList() else byName[pl.name.lowercase()].orEmpty()
             val plan = PlaylistPlan(
                 name = pl.name,
                 existingId = existing.firstOrNull(),
                 duplicateNames = existing.size > 1,
                 match = match,
                 skipped = !match.complete,
+                isFavorites = fav,
             )
             plans.add(plan)
             log.add(
                 "${pl.name}: ${match.matched}/${match.total} abbinate" +
-                    (if (plan.skipped) " → SALTATA" else if (plan.existingId != null) " → sostituisci" else " → crea")
+                    (when {
+                        plan.skipped -> " → SALTATA"
+                        fav -> " → preferiti ★"
+                        plan.existingId != null -> " → sostituisci"
+                        else -> " → crea"
+                    })
             )
         }
         onProgress(
@@ -76,13 +90,27 @@ class PushEngine(private val client: SubsonicClient) {
                 )
             )
             try {
-                client.createOrReplacePlaylist(plan.name, plan.existingId, plan.match.songIds)
-                if (plan.existingId != null) {
+                if (plan.isFavorites) {
+                    // Mirror completo: i preferiti sul server diventano ESATTAMENTE le tracce del m3u.
+                    val target = plan.match.songIds
+                    val targetSet = target.toSet()
+                    val current = client.listStarredSongs().map { it.id }
+                    val currentSet = current.toSet()
+                    val toStar = target.filter { it !in currentSet }
+                    val toUnstar = current.filter { it !in targetSet }
+                    client.setStarred(toStar)
+                    client.unsetStarred(toUnstar)
                     replaced++
-                    log.add("Sostituita \"${plan.name}\" (${plan.match.songIds.size} tracce).")
+                    log.add("Preferiti \"${plan.name}\": +${toStar.size} / -${toUnstar.size} (totale ${target.size}).")
                 } else {
-                    created++
-                    log.add("Creata \"${plan.name}\" (${plan.match.songIds.size} tracce).")
+                    client.createOrReplacePlaylist(plan.name, plan.existingId, plan.match.songIds)
+                    if (plan.existingId != null) {
+                        replaced++
+                        log.add("Sostituita \"${plan.name}\" (${plan.match.songIds.size} tracce).")
+                    } else {
+                        created++
+                        log.add("Creata \"${plan.name}\" (${plan.match.songIds.size} tracce).")
+                    }
                 }
             } catch (e: Exception) {
                 log.add("Errore su \"${plan.name}\": ${e.message}")

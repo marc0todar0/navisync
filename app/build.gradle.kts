@@ -16,6 +16,20 @@ android {
         versionName = "0.1.2"
     }
 
+    signingConfigs {
+        // Credenziali passate a runtime (-P... o env), mai committate.
+        // Attivo solo se è presente la password dello store: altrimenti la release resta non firmata.
+        val storePw = (findProperty("RELEASE_STORE_PASSWORD") as String?) ?: System.getenv("RELEASE_STORE_PASSWORD")
+        if (storePw != null) {
+            create("release") {
+                storeFile = rootProject.file("navisync-release.keystore")
+                storePassword = storePw
+                keyAlias = (findProperty("RELEASE_KEY_ALIAS") as String?) ?: System.getenv("RELEASE_KEY_ALIAS") ?: "navisync"
+                keyPassword = (findProperty("RELEASE_KEY_PASSWORD") as String?) ?: System.getenv("RELEASE_KEY_PASSWORD") ?: storePw
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -23,6 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

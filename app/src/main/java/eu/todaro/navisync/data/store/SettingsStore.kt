@@ -23,6 +23,8 @@ class SettingsStore(private val context: Context) {
         val rootFolder = stringPreferencesKey("root_folder")
         val downloadCovers = booleanPreferencesKey("download_covers")
         val syncPlaylists = booleanPreferencesKey("sync_playlists")
+        val syncFavorites = booleanPreferencesKey("sync_favorites")
+        val favoritesName = stringPreferencesKey("favorites_name")
         val mirrorMode = booleanPreferencesKey("mirror_mode")
         val parallelism = intPreferencesKey("parallelism")
     }
@@ -34,6 +36,8 @@ class SettingsStore(private val context: Context) {
             rootFolder = p[Keys.rootFolder] ?: "",
             downloadCovers = p[Keys.downloadCovers] ?: true,
             syncPlaylists = p[Keys.syncPlaylists] ?: true,
+            syncFavorites = p[Keys.syncFavorites] ?: false,
+            favoritesPlaylistName = p[Keys.favoritesName]?.ifBlank { null } ?: "Liked Songs",
             mirrorMode = p[Keys.mirrorMode] ?: false,
             parallelism = p[Keys.parallelism] ?: 4,
         )
@@ -46,6 +50,8 @@ class SettingsStore(private val context: Context) {
             p[Keys.rootFolder] = config.rootFolder
             p[Keys.downloadCovers] = config.downloadCovers
             p[Keys.syncPlaylists] = config.syncPlaylists
+            p[Keys.syncFavorites] = config.syncFavorites
+            p[Keys.favoritesName] = config.favoritesPlaylistName.trim().ifBlank { "Liked Songs" }
             p[Keys.mirrorMode] = config.mirrorMode
             p[Keys.parallelism] = config.parallelism.coerceIn(1, 8)
         }

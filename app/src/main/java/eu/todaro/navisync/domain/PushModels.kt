@@ -21,6 +21,7 @@ data class PlaylistPlan(
     val duplicateNames: Boolean,  // più playlist sul server con lo stesso nome
     val match: MatchResult,
     val skipped: Boolean,         // true se il match è incompleto (non verrà caricata)
+    val isFavorites: Boolean = false, // true → i preferiti (star/unstar) invece di una playlist
 )
 
 /** Esito complessivo del push. */

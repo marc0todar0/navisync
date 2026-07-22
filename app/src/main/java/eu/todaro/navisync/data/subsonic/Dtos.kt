@@ -17,6 +17,7 @@ data class SubsonicResponse(
     val album: AlbumDetail? = null,
     val playlists: PlaylistsContainer? = null,
     val playlist: PlaylistDetail? = null,
+    val starred2: Starred2? = null,
 ) {
     val isOk: Boolean get() = status == "ok"
 }
@@ -55,6 +56,9 @@ data class SongDto(
     val artist: String? = null,
     val album: String? = null,
 )
+
+/** Risposta di getStarred2: le tracce con la stella (i "preferiti"). */
+data class Starred2(val song: List<SongDto> = emptyList())
 
 data class PlaylistsContainer(val playlist: List<PlaylistRef> = emptyList())
 data class PlaylistRef(val id: String = "", val name: String = "", val songCount: Int = 0)
