@@ -91,11 +91,21 @@ class SyncEngine(
                 downloadCovers(songs, onProgress)
             }
 
-            // 5) Playlist
-            if (config.syncPlaylists) {
+            // 5) Playlist (+ preferiti come playlist speciale, se abilitati)
+            if (config.syncPlaylists || config.syncFavorites) {
                 mutex.withLock { phase = SyncProgress.Phase.PLAYLISTS }
                 publish(onProgress)
-                val playlists = client.listPlaylists()
+                val playlists = ArrayList<eu.todaro.navisync.domain.RemotePlaylist>()
+                if (config.syncPlaylists) playlists += client.listPlaylists()
+                if (config.syncFavorites) {
+                    val starredPaths = client.listStarredSongs().map { it.path }
+                    playlists += eu.todaro.navisync.domain.RemotePlaylist(
+                        id = "starred",
+                        name = config.favoritesPlaylistName,
+                        songPaths = starredPaths,
+                    )
+                    addLog("Preferiti: ${starredPaths.size} tracce sul server.")
+                }
                 val written = PlaylistExporter.export(root, songs, playlists)
                 addLog("Esportate $written playlist (.m3u8).")
             }

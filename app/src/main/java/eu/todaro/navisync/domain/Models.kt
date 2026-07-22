@@ -7,6 +7,8 @@ data class ServerConfig(
     val rootFolder: String = "",
     val downloadCovers: Boolean = true,
     val syncPlaylists: Boolean = true,
+    val syncFavorites: Boolean = false,
+    val favoritesPlaylistName: String = "Liked Songs",
     val mirrorMode: Boolean = false,
     val parallelism: Int = 4,
 ) {

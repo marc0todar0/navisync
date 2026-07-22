@@ -122,6 +122,36 @@ class SubsonicClient(
     suspend fun listPlaylistRefs(): List<PlaylistRef> =
         api.getPlaylists().response.check().playlists?.playlist.orEmpty()
 
+    /** Le tracce preferite (starred), con il path relativo alla music folder. */
+    suspend fun listStarredSongs(): List<RemoteSong> {
+        val songs = api.getStarred2().response.check().starred2?.song.orEmpty()
+        return songs.mapNotNull { s ->
+            val path = s.path ?: return@mapNotNull null
+            RemoteSong(
+                id = s.id,
+                path = path,
+                size = s.size,
+                suffix = s.suffix ?: path.substringAfterLast('.', ""),
+                coverArt = s.coverArt,
+                albumId = s.albumId,
+            )
+        }
+    }
+
+    /**
+     * Mette (star) o toglie (unstar) la stella a più tracce. I parametri viaggiano in query string,
+     * quindi spezzo in lotti per non generare URL sconfinati con liste molto lunghe. No-op se vuoto.
+     */
+    suspend fun setStarred(ids: List<String>) = batchStar(ids, star = true)
+    suspend fun unsetStarred(ids: List<String>) = batchStar(ids, star = false)
+
+    private suspend fun batchStar(ids: List<String>, star: Boolean) {
+        for (batch in ids.chunked(200)) {
+            if (batch.isEmpty()) continue
+            if (star) api.star(batch).response.check() else api.unstar(batch).response.check()
+        }
+    }
+
     /**
      * Crea (se [existingId] è null) o SOSTITUISCE integralmente (se [existingId] è valorizzato)
      * una playlist sul server. Navidrome, quando riceve un playlistId, rimpiazza l'intero

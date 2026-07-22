@@ -37,6 +37,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var rootFolder by mutableStateOf("")
     var downloadCovers by mutableStateOf(true)
     var syncPlaylists by mutableStateOf(true)
+    var syncFavorites by mutableStateOf(false)
+    var favoritesName by mutableStateOf("Liked Songs")
     var mirrorMode by mutableStateOf(false)
     var parallelism by mutableStateOf(4)
 
@@ -63,6 +65,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             downloadCovers = c.downloadCovers
             syncPlaylists = c.syncPlaylists
+            syncFavorites = c.syncFavorites
+            favoritesName = c.favoritesPlaylistName
             mirrorMode = c.mirrorMode
             parallelism = c.parallelism
             password = store.readPassword()
@@ -70,12 +74,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Nome preferiti da usare nel push, solo se la funzione è attiva (altrimenti resta una playlist normale). */
+    private fun favoritesNameOrNull(): String? =
+        if (syncFavorites) favoritesName.trim().ifBlank { "Liked Songs" } else null
+
     private fun currentConfig() = ServerConfig(
         baseUrl = baseUrl.trim(),
         username = username.trim(),
         rootFolder = rootFolder.trim(),
         downloadCovers = downloadCovers,
         syncPlaylists = syncPlaylists,
+        syncFavorites = syncFavorites,
+        favoritesPlaylistName = favoritesName.trim().ifBlank { "Liked Songs" },
         mirrorMode = mirrorMode,
         parallelism = parallelism,
     )
@@ -117,7 +127,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val plans = withContext(Dispatchers.IO) {
-                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password))
+                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password), favoritesNameOrNull())
                         .analyze(parsed) { PushBus.update(it) }
                 }
                 PushBus.setPlans(plans)
@@ -139,7 +149,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password))
+                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password), favoritesNameOrNull())
                         .push(plans) { PushBus.update(it) }
                 }
             } catch (e: Exception) {

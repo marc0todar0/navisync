@@ -139,6 +139,23 @@ private fun SetupSection(vm: MainViewModel) {
         Text("  Sincronizza playlist (.m3u8)")
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
+        Switch(checked = vm.syncFavorites, onCheckedChange = { vm.syncFavorites = it })
+        Text("  Sincronizza preferiti (★) come playlist")
+    }
+    if (vm.syncFavorites) {
+        val favName = vm.favoritesName.trim().ifBlank { "Liked Songs" }
+        OutlinedTextField(
+            value = vm.favoritesName,
+            onValueChange = { vm.favoritesName = it },
+            label = { Text("Nome playlist preferiti") },
+            supportingText = {
+                Text("In download genera «$favName.m3u8» dai preferiti; in upload una playlist con questo nome aggiorna le stelle sul server.")
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = vm.mirrorMode, onCheckedChange = { vm.mirrorMode = it })
         Text("  Mirror (elimina i file non più sul server)")
     }
@@ -256,6 +273,7 @@ private fun PushSection(vm: MainViewModel) {
                 plans.forEach { plan ->
                     val action = when {
                         plan.skipped -> "saltata"
+                        plan.isFavorites -> "preferiti ★"
                         plan.existingId != null -> "sostituisci"
                         else -> "crea"
                     }
