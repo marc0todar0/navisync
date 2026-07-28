@@ -19,7 +19,7 @@ import java.io.File
 
 /**
  * Sync idempotente: indicizza il server, scarica solo i file mancanti/diversi,
- * esporta le playlist e (opzionale) rispecchia le copertine / elimina gli extra.
+ * esporta le playlist e (opzionale) le copertine.
  */
 class SyncEngine(
     private val client: SubsonicClient,
@@ -108,12 +108,6 @@ class SyncEngine(
                 }
                 val written = PlaylistExporter.export(root, songs, playlists)
                 addLog("Esportate $written playlist (.m3u8).")
-            }
-
-            // 6) Mirror (opzionale)
-            if (config.mirrorMode) {
-                val removed = mirror(songs)
-                addLog("Mirror: rimossi $removed file non più sul server.")
             }
 
             mutex.withLock { phase = SyncProgress.Phase.DONE }
@@ -214,28 +208,5 @@ class SyncEngine(
         } finally {
             part.delete() // rimuove il temporaneo se ancora presente
         }
-    }
-
-    private fun mirror(songs: List<RemoteSong>): Int {
-        val expected = HashSet<String>()
-        for (s in songs) {
-            val f = PathUtils.localFileFor(root, s.path)
-            expected.add(f.canonicalPath)
-            File(f.parentFile, "cover.jpg").let { expected.add(it.canonicalPath) }
-        }
-        val playlistsDir = File(root, "Playlists").canonicalPath
-        var removed = 0
-        root.walkBottomUp().forEach { f ->
-            if (f.isFile) {
-                val p = f.canonicalPath
-                if (p.startsWith(playlistsDir)) return@forEach
-                if (p !in expected) {
-                    if (f.delete()) removed++
-                }
-            } else if (f.isDirectory && f != root && f.listFiles()?.isEmpty() == true) {
-                f.delete()
-            }
-        }
-        return removed
     }
 }

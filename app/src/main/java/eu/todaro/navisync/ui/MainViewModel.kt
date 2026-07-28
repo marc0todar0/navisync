@@ -39,7 +39,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var syncPlaylists by mutableStateOf(true)
     var syncFavorites by mutableStateOf(false)
     var favoritesName by mutableStateOf("Liked Songs")
-    var mirrorMode by mutableStateOf(false)
     var parallelism by mutableStateOf(4)
 
     var testState by mutableStateOf<TestState>(TestState.Idle)
@@ -67,7 +66,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             syncPlaylists = c.syncPlaylists
             syncFavorites = c.syncFavorites
             favoritesName = c.favoritesPlaylistName
-            mirrorMode = c.mirrorMode
             parallelism = c.parallelism
             password = store.readPassword()
             configured = c.isComplete
@@ -86,7 +84,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         syncPlaylists = syncPlaylists,
         syncFavorites = syncFavorites,
         favoritesPlaylistName = favoritesName.trim().ifBlank { "Liked Songs" },
-        mirrorMode = mirrorMode,
         parallelism = parallelism,
     )
 

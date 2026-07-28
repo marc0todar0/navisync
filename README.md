@@ -24,7 +24,6 @@ Il sync gira in un `WorkManager` con notifica di avanzamento e sopravvive alla c
 - **Sincronizza playlist** — esporta `.m3u8` con percorsi relativi.
 - **Sincronizza preferiti** *(default OFF)* — tratta i preferiti (tracce con la stella) come una playlist
   speciale, con nome configurabile (default `Liked Songs`). Vedi sotto.
-- **Mirror** *(default OFF)* — elimina in locale i file non più presenti sul server.
 - **Download paralleli** — 1–8 (default 4).
 
 ### Preferiti (Liked Songs)
@@ -38,24 +37,63 @@ entrambe le direzioni:
   abbinata alla libreria, il file è saltato e le stelle non vengono toccate; un file vuoto è ignorato per
   sicurezza (non azzera i preferiti).
 
-## Permessi
+## Versione Linux (TUI)
+Stessa logica di sync, interfaccia a terminale (Lanterna) invece di Compose: gira anche via SSH.
+
+```bash
+just tui              # build + avvio dell'interfaccia
+just sync             # sync headless con la config salvata (cron/systemd)
+just desktop-install  # symlink in ~/.local/bin
+```
+
+Nella TUI: form di configurazione, `Verifica`, `Salva`, `Sync ora` (finestra con avanzamento, log e
+`Interrompi`) e `Playlist` per caricare `.m3u/.m3u8` da un file o da un'intera cartella.
+
+Per averla anche nel launcher (Omarchy/Hyprland), `~/.local/share/applications/NaviSync.desktop`:
+
+```ini
+[Desktop Entry]
+Name=NaviSync
+Exec=xdg-terminal-exec --app-id=TUI.tile -e navisync
+Terminal=false
+Type=Application
+Icon=folder-music
+```
+
+La config sta in `~/.config/navisync/config.properties` (rispetta `XDG_CONFIG_HOME`), un file di testo
+modificabile a mano. Su Linux non c'è un keystore su cui contare come su Android, quindi **la password
+è in chiaro** in quel file, creato con permessi `0600`; in alternativa passala da `NAVISYNC_PASSWORD`
+(ha la precedenza e non viene mai scritta su disco), che è la via giusta per cron e systemd.
+
+## Struttura
+```
+core/      logica condivisa: sync engine, client Subsonic, playlist, matcher (Kotlin/JVM puro)
+app/       Android: Compose, WorkManager, DataStore + Jetpack Security
+desktop/   Linux: TUI Lanterna, config su file, coroutine al posto del WorkManager
+```
+
+## Permessi (Android)
 L'app usa **MANAGE_EXTERNAL_STORAGE** ("accesso a tutti i file"): è pensata per essere installata via
 APK (sideload) e scrivere in una cartella normale (es. `/sdcard/Music/NaviSync`) accessibile da altri
 player. Per una eventuale pubblicazione su Play Store andrebbe riscritta su Storage Access Framework.
 
 ## Build
-Richiede JDK 17+ e Android SDK (platform 35, build-tools 35).
+Richiede JDK 17+ (il bytecode è 17, ma si compila con JDK più recenti). L'APK richiede anche
+l'Android SDK (platform 35, build-tools 35); il binario Linux no.
 
 ```bash
-./gradlew assembleDebug          # genera app/build/outputs/apk/debug/app-debug.apk
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+just            # elenco delle ricette
+just debug      # APK di debug
+just release    # APK firmato (chiede la password del keystore)
+just desktop    # binario Linux in desktop/build/install/navisync
+just check      # compila Android + desktop senza produrre artefatti
 ```
 
 ## Stack
-Kotlin · Jetpack Compose / Material 3 · Retrofit + Moshi + OkHttp · WorkManager ·
-DataStore + Jetpack Security (password cifrata).
+Kotlin · Retrofit + Moshi + OkHttp (condivisi) · Jetpack Compose / Material 3 + WorkManager +
+DataStore e Jetpack Security su Android · Lanterna su Linux.
 
 ## Stato
 v0.1 — connessione, indicizzazione completa, sync brani con download paralleli e ripresa atomica
 (`.part` → rename), copertine, export playlist `.m3u8`, upload playlist su Navidrome, sync preferiti
-bidirezionale (Liked Songs), mirror mode opzionale.
+bidirezionale (Liked Songs). Android e Linux condividono lo stesso motore di sync.
