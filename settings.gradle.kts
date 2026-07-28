@@ -20,4 +20,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "NaviSync"
+include(":core")
 include(":app")
+include(":desktop")

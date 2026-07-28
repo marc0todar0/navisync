@@ -155,10 +155,6 @@ private fun SetupSection(vm: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Switch(checked = vm.mirrorMode, onCheckedChange = { vm.mirrorMode = it })
-        Text("  Mirror (elimina i file non più sul server)")
-    }
     Text("Download paralleli: ${vm.parallelism}")
     Slider(
         value = vm.parallelism.toFloat(),
