@@ -1,6 +1,7 @@
 package eu.todaro.navisync.desktop
 
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.PlaylistPlan
 import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.ServerConfig
@@ -36,7 +37,7 @@ object SyncRunner {
                 SyncBus.update(
                     SyncBus.progress.value.copy(
                         phase = SyncProgress.Phase.FAILED,
-                        error = e.message ?: e.javaClass.simpleName,
+                        error = humanMessage(e),
                     )
                 )
             } finally {
@@ -61,7 +62,7 @@ object PushRunner {
             val plans = engine(config, password).analyze(parsed) { PushBus.update(it) }
             PushBus.setPlans(plans)
         } catch (e: Exception) {
-            PushBus.update(PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Analisi fallita"))
+            PushBus.update(PushProgress(phase = PushProgress.Phase.FAILED, error = "Analisi fallita — ${humanMessage(e)}"))
         } finally {
             PushBus.setRunning(false)
         }
@@ -77,7 +78,7 @@ object PushRunner {
         try {
             engine(config, password).push(plans) { PushBus.update(it) }
         } catch (e: Exception) {
-            PushBus.update(PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Push fallito"))
+            PushBus.update(PushProgress(phase = PushProgress.Phase.FAILED, error = "Push fallito — ${humanMessage(e)}"))
         } finally {
             PushBus.setRunning(false)
         }

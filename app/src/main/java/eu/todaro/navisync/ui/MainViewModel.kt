@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import eu.todaro.navisync.data.store.SettingsStore
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.ServerConfig
 import eu.todaro.navisync.sync.M3uParser
@@ -96,7 +97,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 TestState.Ok
             } catch (e: Exception) {
-                TestState.Error(e.message ?: "Connessione fallita")
+                TestState.Error(humanMessage(e))
             }
         }
     }
@@ -130,7 +131,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 PushBus.setPlans(plans)
             } catch (e: Exception) {
                 PushBus.update(
-                    PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Analisi fallita")
+                    PushProgress(phase = PushProgress.Phase.FAILED, error = "Analisi fallita — ${humanMessage(e)}")
                 )
             } finally {
                 PushBus.setRunning(false)
@@ -151,7 +152,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 PushBus.update(
-                    PushProgress(phase = PushProgress.Phase.FAILED, error = e.message ?: "Push fallito")
+                    PushProgress(phase = PushProgress.Phase.FAILED, error = "Push fallito — ${humanMessage(e)}")
                 )
             } finally {
                 PushBus.setRunning(false)

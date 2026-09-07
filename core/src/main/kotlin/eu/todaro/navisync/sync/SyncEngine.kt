@@ -1,6 +1,7 @@
 package eu.todaro.navisync.sync
 
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.RemoteSong
 import eu.todaro.navisync.domain.ServerConfig
 import eu.todaro.navisync.domain.SyncProgress
@@ -115,9 +116,9 @@ class SyncEngine(
             publish(onProgress)
         } catch (e: Exception) {
             mutex.withLock { phase = SyncProgress.Phase.FAILED }
-            addLog("Errore: ${e.message}")
+            addLog("Errore: ${humanMessage(e)}")
             val snap = mutex.withLock {
-                SyncProgress(phase, total, done, bytes, current, ArrayList(log), error = e.message)
+                SyncProgress(phase, total, done, bytes, current, ArrayList(log), error = humanMessage(e))
             }
             onProgress(snap)
             throw e
@@ -145,7 +146,7 @@ class SyncEngine(
                             lastError = e
                         }
                     }
-                    if (lastError != null) addLog("Salto ${target.name}: ${lastError.message}")
+                    if (lastError != null) addLog("Salto ${target.name}: ${humanMessage(lastError)}")
                     mutex.withLock {
                         done++
                         if (target.exists()) bytes += target.length()

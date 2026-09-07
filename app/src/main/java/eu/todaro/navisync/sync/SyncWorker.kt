@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import eu.todaro.navisync.NaviSyncApp
 import eu.todaro.navisync.data.store.SettingsStore
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.SyncProgress
 import kotlinx.coroutines.flow.first
 import java.io.File
@@ -49,7 +50,7 @@ class SyncWorker(
             SyncBus.update(
                 SyncBus.progress.value.copy(
                     phase = SyncProgress.Phase.FAILED,
-                    error = e.message ?: e.javaClass.simpleName,
+                    error = humanMessage(e),
                 )
             )
             Result.failure()

@@ -23,6 +23,7 @@ import com.googlecode.lanterna.gui2.dialogs.MessageDialog
 import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.PlaylistPlan
 import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.ServerConfig
@@ -178,7 +179,7 @@ class Tui {
             onGui {
                 setStatus(
                     if (result.isSuccess) "OK, connessione riuscita"
-                    else "Errore: ${result.exceptionOrNull()?.message ?: "connessione fallita"}"
+                    else "Errore: ${result.exceptionOrNull()?.let { humanMessage(it) } ?: "connessione fallita"}"
                 )
             }
         }

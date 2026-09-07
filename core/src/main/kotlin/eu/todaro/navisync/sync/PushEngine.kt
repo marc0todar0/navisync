@@ -1,6 +1,7 @@
 package eu.todaro.navisync.sync
 
 import eu.todaro.navisync.data.subsonic.SubsonicClient
+import eu.todaro.navisync.data.subsonic.humanMessage
 import eu.todaro.navisync.domain.PlaylistPlan
 import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.PushReport
@@ -113,7 +114,7 @@ class PushEngine(
                     }
                 }
             } catch (e: Exception) {
-                log.add("Errore su \"${plan.name}\": ${e.message}")
+                log.add("Errore su \"${plan.name}\": ${humanMessage(e)}")
             }
         }
         val skipped = plans.count { it.skipped }
