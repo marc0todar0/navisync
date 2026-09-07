@@ -43,7 +43,10 @@ class SubsonicClient(
     }
 
     val http: OkHttpClient = OkHttpClient.Builder()
+        // Il retry sta SOPRA l'auth: ogni tentativo rigenera salt e token.
+        .addInterceptor(RetryInterceptor())
         .addInterceptor(authInterceptor)
+        .dns(sharedDns)
         .apply {
             if (enableLogging) {
                 addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
@@ -188,6 +191,13 @@ class SubsonicClient(
     }
 
     companion object {
+        /**
+         * Condiviso da tutte le istanze: la UI crea un client nuovo a ogni azione
+         * (verifica, analisi, push) e senza questo la risoluzione buona ottenuta
+         * dalla "Verifica" andrebbe persa subito dopo.
+         */
+        private val sharedDns = LastKnownGoodDns()
+
         fun normalize(url: String): String {
             var u = url.trim()
             if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://$u"
