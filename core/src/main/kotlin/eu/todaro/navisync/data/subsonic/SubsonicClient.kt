@@ -2,6 +2,12 @@ package eu.todaro.navisync.data.subsonic
 
 import eu.todaro.navisync.domain.RemotePlaylist
 import eu.todaro.navisync.domain.RemoteSong
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import okhttp3.Dispatcher
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -12,6 +18,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 class SubsonicException(val code: Int, message: String) : Exception(message)
@@ -47,6 +54,9 @@ class SubsonicClient(
         .addInterceptor(RetryInterceptor())
         .addInterceptor(authInterceptor)
         .dns(sharedDns)
+        // Le chiamate Retrofit suspend passano dal Dispatcher: il default (5 per host) taglierebbe
+        // il parallelismo dell'indicizzazione.
+        .dispatcher(Dispatcher().apply { maxRequestsPerHost = INDEX_PARALLELISM })
         .apply {
             if (enableLogging) {
                 addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
@@ -71,26 +81,42 @@ class SubsonicClient(
         api.ping().response.check()
     }
 
-    /** Enumera TUTTE le tracce: artisti → album → tracce. [onAlbum] notifica l'avanzamento dell'indicizzazione. */
-    suspend fun listSongs(onAlbum: (done: Int, total: Int) -> Unit = { _, _ -> }): List<RemoteSong> {
+    /**
+     * Enumera TUTTE le tracce: artisti → album → tracce. [onAlbum] notifica l'avanzamento dell'indicizzazione.
+     *
+     * Le richieste getArtist/getAlbum partono in parallelo ([INDEX_PARALLELISM] alla volta): sono
+     * centinaia e in sequenza, su 4G + VPN (~0,4 s l'una), l'analisi del push durava 7 minuti.
+     * L'ordine del risultato resta quello sequenziale, così la deduplica per path è deterministica.
+     */
+    suspend fun listSongs(onAlbum: suspend (done: Int, total: Int) -> Unit = { _, _ -> }): List<RemoteSong> = coroutineScope {
+        val sem = Semaphore(INDEX_PARALLELISM)
         val artistsResp = api.getArtists().response.check()
         val artistIds = artistsResp.artists?.index.orEmpty().flatMap { it.artist }.map { it.id }
 
         // Raccoglie gli album UNICI: lo stesso album collaborativo può comparire sotto più
         // artisti (feat.), quindi deduplico per non enumerarlo più volte.
         val albumIds = LinkedHashSet<String>()
-        for (artistId in artistIds) {
-            val detail = api.getArtist(artistId).response.check()
-            detail.artist?.album.orEmpty().forEach { albumIds.add(it.id) }
-        }
+        artistIds
+            .map { id -> async { sem.withPermit { api.getArtist(id).response.check() } } }
+            .awaitAll()
+            .forEach { detail -> detail.artist?.album.orEmpty().forEach { albumIds.add(it.id) } }
+
+        val done = AtomicInteger(0)
+        val albums = albumIds
+            .map { albumId ->
+                async {
+                    val album = sem.withPermit { api.getAlbum(albumId).response.check() }
+                    onAlbum(done.incrementAndGet(), albumIds.size)
+                    albumId to album
+                }
+            }
+            .awaitAll()
 
         // Deduplico anche per path locale: due tracce diverse non devono mai puntare
         // allo stesso file, altrimenti i download paralleli si sovrascrivono a vicenda.
         val songs = mutableListOf<RemoteSong>()
         val seenPaths = HashSet<String>()
-        var done = 0
-        for (albumId in albumIds) {
-            val album = api.getAlbum(albumId).response.check()
+        for ((albumId, album) in albums) {
             album.album?.song.orEmpty().forEach { s ->
                 val path = s.path ?: return@forEach
                 if (!seenPaths.add(path)) return@forEach
@@ -105,10 +131,8 @@ class SubsonicClient(
                     )
                 )
             }
-            done++
-            onAlbum(done, albumIds.size)
         }
-        return songs
+        songs
     }
 
     suspend fun listPlaylists(): List<RemotePlaylist> {
@@ -197,6 +221,9 @@ class SubsonicClient(
          * dalla "Verifica" andrebbe persa subito dopo.
          */
         private val sharedDns = LastKnownGoodDns()
+
+        /** Richieste contemporanee durante l'indicizzazione della libreria. */
+        private const val INDEX_PARALLELISM = 8
 
         fun normalize(url: String): String {
             var u = url.trim()

@@ -26,7 +26,15 @@ class PushEngine(
     ): List<PlaylistPlan> {
         val log = ArrayList<String>()
         onProgress(PushProgress(phase = PushProgress.Phase.ANALYZING, current = "Indicizzo la libreria…", log = ArrayList(log)))
-        val songs = client.listSongs()
+        val songs = client.listSongs { d, t ->
+            // Indicizzare è la parte lunga: senza questo la UI resta ferma su "0/0".
+            onProgress(
+                PushProgress(
+                    phase = PushProgress.Phase.ANALYZING,
+                    current = "Indicizzo la libreria… album $d/$t", log = ArrayList(log),
+                )
+            )
+        }
         val matcher = PlaylistMatcher(songs)
         log.add("Indicizzate ${songs.size} tracce sul server.")
 

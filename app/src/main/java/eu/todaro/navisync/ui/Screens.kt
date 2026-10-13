@@ -302,7 +302,10 @@ private fun PushSection(vm: MainViewModel) {
 
     if (progress.phase != PushProgress.Phase.IDLE) {
         val label = when (progress.phase) {
-            PushProgress.Phase.ANALYZING -> "Analisi… ${progress.done}/${progress.total}"
+            // Finché total è 0 sta ancora indicizzando la libreria: mostro quell'avanzamento.
+            PushProgress.Phase.ANALYZING ->
+                if (progress.total == 0 && progress.current.isNotBlank()) progress.current
+                else "Analisi… ${progress.done}/${progress.total}"
             PushProgress.Phase.PUSHING -> "Caricamento ${progress.done}/${progress.total}"
             PushProgress.Phase.DONE -> "Completato"
             PushProgress.Phase.FAILED -> "Errore: ${progress.error ?: ""}"
