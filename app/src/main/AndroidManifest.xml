@@ -32,6 +32,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Ingresso per i player (Auxio): riceve le playlist e le carica in background.
+             Esportata, ma accetta solo i chiamanti elencati in PlaylistPushActivity. -->
+        <activity
+            android:name=".push.PlaylistPushActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <!-- WorkManager usa questo service per i worker in foreground: su Android 14+ il
              foregroundServiceType passato a startForeground deve essere dichiarato qui,
              altrimenti il processo crasha (IllegalArgumentException: not a subset). -->

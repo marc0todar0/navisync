@@ -58,7 +58,14 @@ class PlaylistMatcher(songs: List<RemoteSong>) {
     }
 
     private fun matchOne(raw: String): String? {
-        val segs = normalizedSegments(decode(raw))
+        // Prima il path così com'è, poi la versione URL-decodificata: decodificare sempre
+        // rovinerebbe i nomi che contengono davvero `+` o `%` (es. "C++", "100%").
+        val plain = raw.removePrefix("file://")
+        return matchSegments(normalizedSegments(plain))
+            ?: decode(raw).takeIf { it != plain }?.let { matchSegments(normalizedSegments(it)) }
+    }
+
+    private fun matchSegments(segs: List<String>): String? {
         if (segs.isEmpty()) return null
 
         // 1) suffisso full-path più lungo con hit univoco

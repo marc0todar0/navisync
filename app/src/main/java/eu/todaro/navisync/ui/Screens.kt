@@ -247,21 +247,22 @@ private fun PushSection(vm: MainViewModel) {
                     name to content
                 }
             }
-            if (files.isNotEmpty()) vm.analyzeM3u(files)
+            if (files.isNotEmpty()) vm.syncM3u(files)
         }
     }
 
     Text("Carica playlist su Navidrome", style = MaterialTheme.typography.titleMedium)
     Text(
-        "Seleziona file .m3u/.m3u8 (es. esportati da Auxio). Le tracce vengono abbinate alla libreria: " +
-            "playlist con nome già esistente vengono sostituite, le altre create.",
+        "Seleziona file .m3u/.m3u8: vengono caricati subito, in una sola passata. Le playlist con nome " +
+            "già esistente vengono sostituite, le altre create; quelle con tracce non trovate sul server " +
+            "vengono saltate. Da Auxio basta il tasto «Sync playlists to Navidrome».",
         style = MaterialTheme.typography.bodySmall,
     )
     Button(
         onClick = { picker.launch(arrayOf("*/*")) },
         enabled = !running && vm.baseUrl.isNotBlank(),
         modifier = Modifier.fillMaxWidth(),
-    ) { Text("Seleziona file .m3u/.m3u8") }
+    ) { Text(if (running) "Caricamento…" else "Seleziona file e carica") }
 
     if (plans.isNotEmpty()) {
         Card(Modifier.fillMaxWidth()) {
@@ -270,8 +271,8 @@ private fun PushSection(vm: MainViewModel) {
                     val action = when {
                         plan.skipped -> "saltata"
                         plan.isFavorites -> "preferiti ★"
-                        plan.existingId != null -> "sostituisci"
-                        else -> "crea"
+                        plan.existingId != null -> "sostituita"
+                        else -> "creata"
                     }
                     val dup = if (plan.duplicateNames) " ⚠ nome duplicato" else ""
                     Text(
@@ -289,14 +290,6 @@ private fun PushSection(vm: MainViewModel) {
                     }
                 }
             }
-        }
-        Button(
-            onClick = { vm.pushPlaylists() },
-            enabled = !running && plans.any { !it.skipped },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            val n = plans.count { !it.skipped }
-            Text(if (running) "Caricamento…" else "Carica su Navidrome ($n)")
         }
     }
 

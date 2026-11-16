@@ -19,6 +19,16 @@ class PushEngine(
     private fun isFavorites(name: String): Boolean =
         !favoritesName.isNullOrBlank() && name.trim().equals(favoritesName.trim(), ignoreCase = true)
 
+    /**
+     * Sync in una sola passata: analizza e carica subito, senza conferma intermedia. Le playlist
+     * non abbinate al 100% restano saltate (e finiscono nel report), le altre vengono create o
+     * sostituite.
+     */
+    suspend fun sync(
+        parsed: List<M3uPlaylist>,
+        onProgress: suspend (PushProgress) -> Unit,
+    ): PushReport = push(analyze(parsed, onProgress), onProgress)
+
     /** Fase di analisi: costruisce un [PlaylistPlan] per ogni m3u senza toccare il server. */
     suspend fun analyze(
         parsed: List<M3uPlaylist>,
@@ -91,6 +101,12 @@ class PushEngine(
         val log = ArrayList<String>()
         var created = 0
         var replaced = 0
+        for (plan in plans.filter { it.skipped }) {
+            log.add(
+                if (plan.match.total == 0) "Saltata \"${plan.name}\": è vuota."
+                else "Saltata \"${plan.name}\": ${plan.match.unmatched.size} tracce su ${plan.match.total} non trovate sul server."
+            )
+        }
         for ((i, plan) in toPush.withIndex()) {
             onProgress(
                 PushProgress(

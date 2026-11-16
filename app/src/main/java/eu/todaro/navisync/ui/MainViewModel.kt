@@ -9,11 +9,11 @@ import androidx.lifecycle.viewModelScope
 import eu.todaro.navisync.data.store.SettingsStore
 import eu.todaro.navisync.data.subsonic.SubsonicClient
 import eu.todaro.navisync.data.subsonic.humanMessage
-import eu.todaro.navisync.domain.PushProgress
 import eu.todaro.navisync.domain.ServerConfig
+import eu.todaro.navisync.push.PushPayload
+import eu.todaro.navisync.push.PushWorker
 import eu.todaro.navisync.sync.M3uParser
 import eu.todaro.navisync.sync.PushBus
-import eu.todaro.navisync.sync.PushEngine
 import eu.todaro.navisync.sync.SyncBus
 import eu.todaro.navisync.sync.SyncWorker
 import kotlinx.coroutines.Dispatchers
@@ -73,10 +73,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Nome preferiti da usare nel push, solo se la funzione è attiva (altrimenti resta una playlist normale). */
-    private fun favoritesNameOrNull(): String? =
-        if (syncFavorites) favoritesName.trim().ifBlank { "Liked Songs" } else null
-
     private fun currentConfig() = ServerConfig(
         baseUrl = baseUrl.trim(),
         username = username.trim(),
@@ -116,47 +112,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         SyncWorker.enqueue(getApplication())
     }
 
-    /** Analizza i m3u selezionati (nome, contenuto già letti dalla UI) abbinandoli al server. */
-    fun analyzeM3u(files: List<Pair<String, String>>) {
+    /**
+     * Carica su Navidrome i m3u selezionati (nome, contenuto già letti dalla UI) in una sola
+     * passata: analisi e upload di fila, in background, senza conferma intermedia.
+     */
+    fun syncM3u(files: List<Pair<String, String>>) {
         if (files.isEmpty() || pushRunning.value) return
         val parsed = files.map { (name, content) -> M3uParser.parse(name, content) }
-        PushBus.setPlans(emptyList())
-        PushBus.setRunning(true)
         viewModelScope.launch {
-            try {
-                val plans = withContext(Dispatchers.IO) {
-                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password), favoritesNameOrNull())
-                        .analyze(parsed) { PushBus.update(it) }
-                }
-                PushBus.setPlans(plans)
-            } catch (e: Exception) {
-                PushBus.update(
-                    PushProgress(phase = PushProgress.Phase.FAILED, error = "Analisi fallita — ${humanMessage(e)}")
-                )
-            } finally {
-                PushBus.setRunning(false)
-            }
-        }
-    }
-
-    /** Carica su Navidrome le playlist non saltate del piano corrente. */
-    fun pushPlaylists() {
-        val plans = pushPlans.value
-        if (plans.none { !it.skipped } || pushRunning.value) return
-        PushBus.setRunning(true)
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    PushEngine(SubsonicClient(baseUrl.trim(), username.trim(), password), favoritesNameOrNull())
-                        .push(plans) { PushBus.update(it) }
-                }
-            } catch (e: Exception) {
-                PushBus.update(
-                    PushProgress(phase = PushProgress.Phase.FAILED, error = "Push fallito — ${humanMessage(e)}")
-                )
-            } finally {
-                PushBus.setRunning(false)
-            }
+            // Il worker legge server e credenziali dallo store: salvo prima quelli a schermo.
+            store.saveConfig(currentConfig())
+            store.savePassword(password)
+            configured = currentConfig().isComplete
+            withContext(Dispatchers.IO) { PushPayload.save(getApplication(), parsed) }
+            PushWorker.enqueue(getApplication())
         }
     }
 }

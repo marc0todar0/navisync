@@ -31,11 +31,21 @@ Quando **Sincronizza preferiti** è attivo, il nome scelto mappa alla lista dei 
 entrambe le direzioni:
 - **Download** — le tracce con la stella vengono esportate come `Playlists/<nome>.m3u8` (solo i brani
   presenti su disco), come una normale playlist.
-- **Upload** (scheda *Carica playlist*) — un file `.m3u`/`.m3u8` con quel nome **non** crea una playlist:
+- **Upload** (scheda *Carica playlist*, o tasto di Auxio) — un file `.m3u`/`.m3u8` con quel nome **non** crea una playlist:
   aggiorna le stelle sul server in **mirror completo**, così i preferiti diventano esattamente le tracce
   del file (mette la stella alle nuove, la toglie a quelle non più presenti). Se qualche traccia non viene
   abbinata alla libreria, il file è saltato e le stelle non vengono toccate; un file vuoto è ignorato per
   sicurezza (non azzera i preferiti).
+
+### Caricare le playlist (anche da Auxio)
+L'upload è in **una sola passata**: analisi e caricamento di fila, in background (`PushWorker`), con
+l'esito in una notifica. Le playlist con nome già presente sul server vengono sostituite, le altre
+create; quelle con anche una sola traccia non trovata sul server vengono saltate e segnalate.
+
+- Dalla scheda *Carica playlist*: scegli i `.m3u`/`.m3u8` e parte subito.
+- Dalla fork di Auxio: menu della home → *Sync playlists to Navidrome*. Auxio passa nomi e path
+  delle tracce a `PlaylistPushActivity` (JSON in un content URI), senza esportare file a mano.
+  L'activity accetta solo i pacchetti elencati in `ALLOWED_CALLERS`.
 
 ## Versione Linux (TUI)
 Stessa logica di sync, interfaccia a terminale (Lanterna) invece di Compose: gira anche via SSH.
