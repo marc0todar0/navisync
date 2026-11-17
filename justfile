@@ -12,10 +12,14 @@ debug:
     ./gradlew assembleDebug
     @ls -lh {{debug_apk}}
 
-# APK di release firmato. Password dal env RELEASE_STORE_PASSWORD, altrimenti la chiede.
+# APK di release firmato. Password dal env RELEASE_STORE_PASSWORD, poi da
+# ~/.android/navisync.pass, altrimenti la chiede.
 release:
     #!/usr/bin/env bash
     set -euo pipefail
+    if [[ -z "${RELEASE_STORE_PASSWORD:-}" && -r ~/.android/navisync.pass ]]; then
+        export RELEASE_STORE_PASSWORD="$(cat ~/.android/navisync.pass)"
+    fi
     if [[ -z "${RELEASE_STORE_PASSWORD:-}" ]]; then
         read -rsp "Password keystore (navisync-release.keystore): " RELEASE_STORE_PASSWORD
         echo
