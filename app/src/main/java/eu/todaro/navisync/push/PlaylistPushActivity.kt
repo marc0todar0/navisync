@@ -12,7 +12,7 @@ import kotlinx.coroutines.runBlocking
  * arriva poi con una notifica.
  *
  * Va avviata con `startActivityForResult`: è l'unico modo per sapere con certezza chi chiama, e
- * solo i pacchetti in [ALLOWED_CALLERS] possono far riscrivere le playlist sul server.
+ * solo i pacchetti in [PlayerBridge.ALLOWED_CALLERS] possono far riscrivere le playlist sul server.
  */
 class PlaylistPushActivity : Activity() {
 
@@ -23,7 +23,7 @@ class PlaylistPushActivity : Activity() {
     }
 
     private fun handle(): Int {
-        if (callingPackage !in ALLOWED_CALLERS) return RESULT_CANCELED
+        if (callingPackage !in PlayerBridge.ALLOWED_CALLERS) return RESULT_CANCELED
         val uri = intent?.data ?: return RESULT_CANCELED
 
         val config = runBlocking { SettingsStore(this@PlaylistPushActivity).configFlow.first() }
@@ -46,11 +46,5 @@ class PlaylistPushActivity : Activity() {
         const val RESULT_NOT_CONFIGURED = RESULT_FIRST_USER + 1
 
         private const val MAX_BYTES = 16 * 1024 * 1024
-
-        private val ALLOWED_CALLERS = setOf(
-            "org.oxycblt.auxio.fork",
-            "org.oxycblt.auxio.debug",
-            "org.oxycblt.auxio",
-        )
     }
 }

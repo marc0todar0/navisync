@@ -11,6 +11,13 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!-- Serve per poter mandare ai player il broadcast di fine sync (visibilità pacchetti). -->
+    <queries>
+        <package android:name="org.oxycblt.auxio.fork" />
+        <package android:name="org.oxycblt.auxio.debug" />
+        <package android:name="org.oxycblt.auxio" />
+    </queries>
+
     <application
         android:name=".NaviSyncApp"
         android:allowBackup="true"
@@ -36,6 +43,13 @@
              Esportata, ma accetta solo i chiamanti elencati in PlaylistPushActivity. -->
         <activity
             android:name=".push.PlaylistPushActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <!-- Ingresso per i player (Auxio): avvia il sync dal server. Stessa lista di chiamanti. -->
+        <activity
+            android:name=".push.SyncRequestActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.NoDisplay" />
