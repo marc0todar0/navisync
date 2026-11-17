@@ -22,7 +22,12 @@ android {
         val storePw = (findProperty("RELEASE_STORE_PASSWORD") as String?) ?: System.getenv("RELEASE_STORE_PASSWORD")
         if (storePw != null) {
             create("release") {
-                storeFile = rootProject.file("navisync-release.keystore")
+                // Fuori dal repo: di default ~/.android/navisync-release.keystore.
+                storeFile = file(
+                    (findProperty("RELEASE_STORE_FILE") as String?)
+                        ?: System.getenv("RELEASE_STORE_FILE")
+                        ?: "${System.getProperty("user.home")}/.android/navisync-release.keystore"
+                )
                 storePassword = storePw
                 keyAlias = (findProperty("RELEASE_KEY_ALIAS") as String?) ?: System.getenv("RELEASE_KEY_ALIAS") ?: "navisync"
                 keyPassword = (findProperty("RELEASE_KEY_PASSWORD") as String?) ?: System.getenv("RELEASE_KEY_PASSWORD") ?: storePw

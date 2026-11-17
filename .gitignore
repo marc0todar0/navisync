@@ -9,3 +9,7 @@
 .cxx
 local.properties
 build/
+
+# Chiave di firma: vive in ~/.android, mai nel repo
+*.keystore
+*.jks

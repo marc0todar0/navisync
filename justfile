@@ -21,7 +21,7 @@ release:
         export RELEASE_STORE_PASSWORD="$(cat ~/.android/navisync.pass)"
     fi
     if [[ -z "${RELEASE_STORE_PASSWORD:-}" ]]; then
-        read -rsp "Password keystore (navisync-release.keystore): " RELEASE_STORE_PASSWORD
+        read -rsp "Password keystore (~/.android/navisync-release.keystore): " RELEASE_STORE_PASSWORD
         echo
         export RELEASE_STORE_PASSWORD
     fi
